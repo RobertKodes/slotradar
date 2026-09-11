@@ -191,15 +191,12 @@ export class RadarScope {
     ctx.globalCompositeOperation = 'source-over'
     ctx.drawImage(this.phosphor, 0, 0, cssW, cssH)
 
-    if (this.reduced) {
-      for (const b of this.blips) stamp(ctx, cx, cy, R, b, b.failed ? 0.95 : 0.8)
-    } else {
-      for (const b of this.blips) {
-        if (!b.failed) continue
-        const age = now - b.lastPaint
-        if (age < 0 || age > 2600) continue
-        stamp(ctx, cx, cy, R, b, (1 - age / 2600) * 0.7)
-      }
+    for (const b of this.blips) {
+      const age = now - b.born
+      const life = b.failed ? 16000 : 11000
+      if (age > life) continue
+      const persist = Math.max(b.failed ? 0.28 : 0.2, 1 - age / life)
+      stamp(ctx, cx, cy, R, b, persist * (this.frozen ? 0.9 : 0.78))
     }
 
     if (!this.reduced) drawSweep(ctx, cx, cy, R, this.sweep, this.fee, this.frozen)
@@ -222,7 +219,7 @@ export class RadarScope {
     }
 
     if (!this.frozen) {
-      const fade = 0.012 + (1 - this.fee) * 0.028
+      const fade = 0.0035 + (1 - this.fee) * 0.005
       p.save()
       p.globalCompositeOperation = 'source-over'
       p.fillStyle = hexAlpha(PALETTE.pitch, fade)
@@ -412,16 +409,16 @@ function drawSweep(
   fee: number,
   frozen: boolean,
 ) {
-  const width = 0.34 + fee * 0.14
+  const width = 0.36 + fee * 0.12
   ctx.save()
   ctx.beginPath()
   ctx.moveTo(cx, cy)
   ctx.arc(cx, cy, R, canvasAngle(sweep - width), canvasAngle(sweep), false)
   ctx.closePath()
   const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R)
-  g.addColorStop(0, hexAlpha(PALETTE.phosphor, frozen ? 0.1 : 0.2 + fee * 0.1))
-  g.addColorStop(0.62, hexAlpha(PALETTE.phosphor, frozen ? 0.05 : 0.11 + fee * 0.06))
-  g.addColorStop(1, hexAlpha(PALETTE.phosphor, frozen ? 0.02 : 0.04))
+  g.addColorStop(0, hexAlpha(PALETTE.phosphor, frozen ? 0.16 : 0.38 + fee * 0.1))
+  g.addColorStop(0.55, hexAlpha(PALETTE.phosphor, frozen ? 0.08 : 0.2 + fee * 0.06))
+  g.addColorStop(1, hexAlpha(PALETTE.phosphor, frozen ? 0.03 : 0.06))
   ctx.fillStyle = g
   ctx.fill()
 
