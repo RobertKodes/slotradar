@@ -14,7 +14,7 @@ Live: https://robertkodes.github.io/slotradar/
 
 | Scope | Chain |
 | --- | --- |
-| Sweep arm | Confirmed slot clock (64 slots / revolution) |
+| Sweep arm | Confirmed slot clock (48 slots / revolution) |
 | Blip | A recent transaction |
 | Callsign tint | Program family: system, JUP, RAY, token, stake, unknown |
 | Clutter / bloom / afterglow | `getRecentPrioritizationFees` pressure, log-scaled |
@@ -57,7 +57,7 @@ Vite serves at `/slotradar/`. Open that path, not `/`.
 npm run build
 ```
 
-must pass. Static `dist/` is force-pushed to the `gh-pages` branch at root (`index.html`, `assets/`, `.nojekyll`). Repo Pages source should be **branch `gh-pages` / folder `/`**. If the live URL 404s: GitHub → Settings → Pages → source **`gh-pages` / root**.
+must pass. Static `dist/` is force-pushed to the `gh-pages` branch at root (`index.html`, `assets/`, `.nojekyll`). Repo Pages source should be **branch `gh-pages` / folder `/`**. `gh-pages` already holds `index.html`, `assets/`, and `.nojekyll` at branch root. Enabling Pages via API returned **403** (token cannot write Pages settings). One click: GitHub → Settings → Pages → source **`gh-pages` / root**.
 
 Public RPC, rotating on failure (no API keys):
 

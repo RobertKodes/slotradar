@@ -99,7 +99,7 @@ h1 {
   margin: 0.08rem 0 0;
   font-weight: 700;
   font-size: clamp(1.7rem, 4.2vw, 2.55rem);
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   color: var(--phosphor);
   text-shadow: 0 0 18px color-mix(in srgb, var(--phosphor) 35%, transparent);
 }
@@ -108,8 +108,9 @@ h1 {
   margin: 0.12rem 0 0;
   font-weight: 500;
   font-size: 0.92rem;
-  letter-spacing: 0.04em;
-  color: color-mix(in srgb, var(--glass) 80%, var(--pitch));
+  letter-spacing: 0.03em;
+  word-spacing: 0.08em;
+  color: color-mix(in srgb, var(--glass) 88%, var(--pitch));
 }
 
 .bay {
@@ -152,7 +153,7 @@ h1 {
   font-size: 0.58rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--dim);
+  color: color-mix(in srgb, var(--amber) 55%, var(--dim));
 }
 
 .reads {

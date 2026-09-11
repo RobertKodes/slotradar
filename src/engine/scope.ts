@@ -17,7 +17,7 @@ type Blip = {
 }
 
 const TAU = Math.PI * 2
-const SLOTS_PER_REV = 64
+const SLOTS_PER_REV = 48
 const RAD_PER_SLOT = TAU / SLOTS_PER_REV
 
 export function hash32(s: string): number {
@@ -29,9 +29,15 @@ export function hash32(s: string): number {
   return h >>> 0
 }
 
-function polar(sig: string | null, family: Family, salt: number): { bearing: number; range: number } {
+function polar(
+  sig: string | null,
+  family: Family,
+  salt: number,
+  sweep: number,
+): { bearing: number; range: number } {
   const h = sig ? hash32(sig) : (Math.imul(salt, 2654435761) >>> 0)
-  const bearing = ((h & 0xffff) / 0xffff) * TAU
+  const spread = (((h & 0xffff) / 0xffff) - 0.5) * 0.28
+  const bearing = (sweep + spread + TAU) % TAU
   const band: Record<Family, number> = {
     SYS: 0.3,
     JUP: 0.44,
@@ -100,7 +106,7 @@ export class RadarScope {
 
   ingest(spec: ContactSpec | null, now: number) {
     if (!spec) return
-    const { bearing, range } = polar(spec.sig, spec.family, this.salt++)
+    const { bearing, range } = polar(spec.sig, spec.family, this.salt++, this.sweep)
     this.blips.push({
       bearing,
       range,
@@ -216,7 +222,7 @@ export class RadarScope {
     }
 
     if (!this.frozen) {
-      const fade = 0.028 + (1 - this.fee) * 0.065
+      const fade = 0.012 + (1 - this.fee) * 0.028
       p.save()
       p.globalCompositeOperation = 'source-over'
       p.fillStyle = hexAlpha(PALETTE.pitch, fade)
@@ -232,9 +238,19 @@ export class RadarScope {
         sprinkle(p, cx, cy, R, a0, a1, this.fee)
         for (const b of this.blips) {
           if (!inArc(b.bearing, a0, a1)) continue
-          stamp(p, cx, cy, R, b, b.failed ? 1 : 0.92)
+          stamp(p, cx, cy, R, b, b.failed ? 1 : 0.95)
           b.lastPaint = now
         }
+      }
+      const trailW = 0.4 + this.fee * 0.18
+      const trail0 = (this.sweep - trailW + TAU) % TAU
+      for (const [a0, a1] of swept(trail0, this.sweep)) {
+        washSector(p, cx, cy, R, a0, a1, this.fee * 0.55)
+      }
+      for (const b of this.blips) {
+        if (b.lastPaint > 0) continue
+        stamp(p, cx, cy, R, b, b.failed ? 1 : 0.88)
+        b.lastPaint = now
       }
     }
   }
@@ -250,7 +266,7 @@ function clearSector(
 ) {
   ctx.save()
   ctx.globalCompositeOperation = 'destination-out'
-  ctx.fillStyle = 'rgba(0,0,0,0.62)'
+  ctx.fillStyle = 'rgba(0,0,0,0.18)'
   ctx.beginPath()
   ctx.moveTo(cx, cy)
   ctx.arc(cx, cy, R, canvasAngle(a0), canvasAngle(a1), false)
@@ -270,7 +286,7 @@ function washSector(
 ) {
   ctx.save()
   ctx.globalCompositeOperation = 'lighter'
-  ctx.fillStyle = hexAlpha(PALETTE.phosphor, 0.045 + fee * 0.07)
+  ctx.fillStyle = hexAlpha(PALETTE.phosphor, 0.16 + fee * 0.18)
   ctx.beginPath()
   ctx.moveTo(cx, cy)
   ctx.arc(cx, cy, R, canvasAngle(a0), canvasAngle(a1), false)
@@ -289,7 +305,7 @@ function sprinkle(
   fee: number,
 ) {
   const span = (a1 - a0 + TAU) % TAU || 0.01
-  const n = Math.floor(2 + fee * 22 + span * 8)
+  const n = Math.floor(6 + fee * 36 + span * 14)
   ctx.save()
   ctx.globalCompositeOperation = 'lighter'
   for (let i = 0; i < n; i++) {
@@ -297,8 +313,8 @@ function sprinkle(
     const r = (0.12 + Math.random() * 0.82) * R
     const x = cx + Math.sin(a) * r
     const y = cy - Math.cos(a) * r
-    ctx.fillStyle = hexAlpha(PALETTE.phosphor, 0.04 + Math.random() * 0.08 * (0.4 + fee))
-    ctx.fillRect(x, y, 1.1, 1.1)
+    ctx.fillStyle = hexAlpha(PALETTE.phosphor, 0.08 + Math.random() * 0.14 * (0.5 + fee))
+    ctx.fillRect(x, y, 1.35, 1.35)
   }
   ctx.restore()
 }
@@ -314,41 +330,48 @@ function stamp(
   const x = cx + Math.sin(b.bearing) * b.range * R
   const y = cy - Math.cos(b.bearing) * b.range * R
   const color = b.failed ? PALETTE.ghost : familyColor(b.family)
-  const rad = b.failed ? 6.2 : 3.8
-  const g = ctx.createRadialGradient(x, y, 0, x, y, rad * 3.1)
+  const rad = b.failed ? 7.4 : 5.2
+  const g = ctx.createRadialGradient(x, y, 0, x, y, rad * 3.4)
   g.addColorStop(0, hexAlpha(color, alpha))
-  g.addColorStop(0.4, hexAlpha(color, alpha * 0.45))
+  g.addColorStop(0.35, hexAlpha(color, alpha * 0.62))
   g.addColorStop(1, hexAlpha(color, 0))
   ctx.fillStyle = g
   ctx.beginPath()
-  ctx.arc(x, y, rad * 3.1, 0, TAU)
+  ctx.arc(x, y, rad * 3.4, 0, TAU)
   ctx.fill()
-  ctx.fillStyle = hexAlpha('#f3ffe6', alpha * 0.92)
+  ctx.fillStyle = hexAlpha('#f6ffe8', alpha)
   ctx.beginPath()
-  ctx.arc(x, y, b.failed ? 1.55 : 1.1, 0, TAU)
+  ctx.arc(x, y, b.failed ? 2 : 1.55, 0, TAU)
   ctx.fill()
 }
 
 function drawHousing(ctx: CanvasRenderingContext2D, cx: number, cy: number, R: number) {
-  const outer = R + Math.max(16, R * 0.11)
-  const ring = ctx.createRadialGradient(cx, cy, R, cx, cy, outer)
-  ring.addColorStop(0, '#1a261c')
-  ring.addColorStop(0.45, '#0f1611')
-  ring.addColorStop(1, '#1c281e')
+  const outer = R + Math.max(22, R * 0.14)
+  const ring = ctx.createRadialGradient(cx - outer * 0.15, cy - outer * 0.2, R, cx, cy, outer)
+  ring.addColorStop(0, '#243328')
+  ring.addColorStop(0.4, '#151f18')
+  ring.addColorStop(0.78, '#1c281f')
+  ring.addColorStop(1, '#0c120e')
   ctx.beginPath()
   ctx.arc(cx, cy, outer, 0, TAU)
   ctx.fillStyle = ring
   ctx.fill()
 
   ctx.beginPath()
-  ctx.arc(cx, cy, outer - 2, 0, TAU)
-  ctx.strokeStyle = hexAlpha(PALETTE.amber, 0.18)
-  ctx.lineWidth = 1
+  ctx.arc(cx, cy, outer - 1.5, 0, TAU)
+  ctx.strokeStyle = hexAlpha(PALETTE.amber, 0.32)
+  ctx.lineWidth = 1.4
   ctx.stroke()
 
   ctx.beginPath()
-  ctx.arc(cx, cy, R + 3, 0, TAU)
-  ctx.strokeStyle = hexAlpha(PALETTE.reticule, 0.7)
+  ctx.arc(cx, cy, R + 4.5, 0, TAU)
+  ctx.strokeStyle = hexAlpha(PALETTE.phosphor, 0.28)
+  ctx.lineWidth = 3
+  ctx.stroke()
+
+  ctx.beginPath()
+  ctx.arc(cx, cy, R + 1.2, 0, TAU)
+  ctx.strokeStyle = hexAlpha(PALETTE.reticule, 0.95)
   ctx.lineWidth = 2
   ctx.stroke()
 }
@@ -369,8 +392,8 @@ function drawReticule(ctx: CanvasRenderingContext2D, cx: number, cy: number, R: 
   ctx.beginPath()
   ctx.arc(cx, cy, R, 0, TAU)
   ctx.clip()
-  ctx.strokeStyle = hexAlpha(PALETTE.reticule, 0.72)
-  ctx.lineWidth = 1
+  ctx.strokeStyle = hexAlpha(PALETTE.reticule, 0.88)
+  ctx.lineWidth = 1.15
   for (const f of [0.25, 0.5, 0.75, 1]) {
     ctx.beginPath()
     ctx.arc(cx, cy, R * f, 0, TAU)
@@ -394,7 +417,7 @@ function drawSweep(
   fee: number,
   frozen: boolean,
 ) {
-  const width = 0.22 + fee * 0.18
+  const width = 0.42 + fee * 0.22
   ctx.save()
   ctx.globalCompositeOperation = 'lighter'
   ctx.beginPath()
@@ -402,21 +425,26 @@ function drawSweep(
   ctx.arc(cx, cy, R, canvasAngle(sweep - width), canvasAngle(sweep), false)
   ctx.closePath()
   const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R)
-  g.addColorStop(0, hexAlpha(PALETTE.phosphor, frozen ? 0.08 : 0.18 + fee * 0.12))
-  g.addColorStop(1, hexAlpha(PALETTE.phosphor, frozen ? 0.02 : 0.04))
+  g.addColorStop(0, hexAlpha(PALETTE.phosphor, frozen ? 0.12 : 0.32 + fee * 0.18))
+  g.addColorStop(0.55, hexAlpha(PALETTE.phosphor, frozen ? 0.06 : 0.16 + fee * 0.1))
+  g.addColorStop(1, hexAlpha(PALETTE.phosphor, frozen ? 0.03 : 0.07))
   ctx.fillStyle = g
   ctx.fill()
 
   const x = cx + Math.sin(sweep) * R
   const y = cy - Math.cos(sweep) * R
-  ctx.strokeStyle = hexAlpha(PALETTE.phosphor, frozen ? 0.45 : 0.95)
-  ctx.lineWidth = frozen ? 1.2 : 2
+  ctx.strokeStyle = hexAlpha(PALETTE.phosphor, frozen ? 0.55 : 1)
+  ctx.lineWidth = frozen ? 1.6 : 2.8
   ctx.shadowColor = PALETTE.phosphor
-  ctx.shadowBlur = frozen ? 4 : 10 + fee * 10
+  ctx.shadowBlur = frozen ? 6 : 18 + fee * 14
   ctx.beginPath()
   ctx.moveTo(cx, cy)
   ctx.lineTo(x, y)
   ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(x, y, 3.2, 0, TAU)
+  ctx.fillStyle = hexAlpha('#f3ffe6', frozen ? 0.45 : 0.95)
+  ctx.fill()
   ctx.restore()
 }
 
@@ -486,7 +514,7 @@ function drawBezelMarks(
   ctx.strokeStyle = hexAlpha(PALETTE.reticule, 0.85)
   ctx.fillStyle = hexAlpha(PALETTE.amber, 0.72)
   ctx.lineWidth = 1.2
-  ctx.font = '600 10px "Share Tech Mono", ui-monospace, monospace'
+  ctx.font = '600 12px "Share Tech Mono", ui-monospace, monospace'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   for (let i = 0; i < 360; i += 10) {
