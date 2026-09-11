@@ -188,7 +188,7 @@ export class RadarScope {
     ctx.beginPath()
     ctx.arc(cx, cy, R - 0.8, 0, TAU)
     ctx.clip()
-    ctx.globalCompositeOperation = 'lighter'
+    ctx.globalCompositeOperation = 'source-over'
     ctx.drawImage(this.phosphor, 0, 0, cssW, cssH)
 
     if (this.reduced) {
@@ -242,11 +242,6 @@ export class RadarScope {
           b.lastPaint = now
         }
       }
-      const trailW = 0.4 + this.fee * 0.18
-      const trail0 = (this.sweep - trailW + TAU) % TAU
-      for (const [a0, a1] of swept(trail0, this.sweep)) {
-        washSector(p, cx, cy, R, a0, a1, this.fee * 0.55)
-      }
       for (const b of this.blips) {
         if (b.lastPaint > 0) continue
         stamp(p, cx, cy, R, b, b.failed ? 1 : 0.88)
@@ -286,7 +281,7 @@ function washSector(
 ) {
   ctx.save()
   ctx.globalCompositeOperation = 'lighter'
-  ctx.fillStyle = hexAlpha(PALETTE.phosphor, 0.16 + fee * 0.18)
+  ctx.fillStyle = hexAlpha(PALETTE.phosphor, 0.07 + fee * 0.08)
   ctx.beginPath()
   ctx.moveTo(cx, cy)
   ctx.arc(cx, cy, R, canvasAngle(a0), canvasAngle(a1), false)
@@ -417,33 +412,34 @@ function drawSweep(
   fee: number,
   frozen: boolean,
 ) {
-  const width = 0.42 + fee * 0.22
+  const width = 0.34 + fee * 0.14
   ctx.save()
-  ctx.globalCompositeOperation = 'lighter'
   ctx.beginPath()
   ctx.moveTo(cx, cy)
   ctx.arc(cx, cy, R, canvasAngle(sweep - width), canvasAngle(sweep), false)
   ctx.closePath()
   const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R)
-  g.addColorStop(0, hexAlpha(PALETTE.phosphor, frozen ? 0.12 : 0.32 + fee * 0.18))
-  g.addColorStop(0.55, hexAlpha(PALETTE.phosphor, frozen ? 0.06 : 0.16 + fee * 0.1))
-  g.addColorStop(1, hexAlpha(PALETTE.phosphor, frozen ? 0.03 : 0.07))
+  g.addColorStop(0, hexAlpha(PALETTE.phosphor, frozen ? 0.1 : 0.2 + fee * 0.1))
+  g.addColorStop(0.62, hexAlpha(PALETTE.phosphor, frozen ? 0.05 : 0.11 + fee * 0.06))
+  g.addColorStop(1, hexAlpha(PALETTE.phosphor, frozen ? 0.02 : 0.04))
   ctx.fillStyle = g
   ctx.fill()
 
+  ctx.globalCompositeOperation = 'lighter'
   const x = cx + Math.sin(sweep) * R
   const y = cy - Math.cos(sweep) * R
-  ctx.strokeStyle = hexAlpha(PALETTE.phosphor, frozen ? 0.55 : 1)
-  ctx.lineWidth = frozen ? 1.6 : 2.8
+  ctx.strokeStyle = hexAlpha(PALETTE.phosphor, frozen ? 0.5 : 0.92)
+  ctx.lineWidth = frozen ? 1.5 : 2.2
   ctx.shadowColor = PALETTE.phosphor
-  ctx.shadowBlur = frozen ? 6 : 18 + fee * 14
+  ctx.shadowBlur = frozen ? 4 : 8 + fee * 6
   ctx.beginPath()
   ctx.moveTo(cx, cy)
   ctx.lineTo(x, y)
   ctx.stroke()
+  ctx.shadowBlur = 0
   ctx.beginPath()
-  ctx.arc(x, y, 3.2, 0, TAU)
-  ctx.fillStyle = hexAlpha('#f3ffe6', frozen ? 0.45 : 0.95)
+  ctx.arc(x, y, 2.4, 0, TAU)
+  ctx.fillStyle = hexAlpha(PALETTE.phosphor, frozen ? 0.4 : 0.85)
   ctx.fill()
   ctx.restore()
 }
